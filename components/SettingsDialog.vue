@@ -388,65 +388,6 @@
                 全てのデータを削除（RAG含む）
               </v-btn>
             </div>
-            
-            <v-divider class="my-4" />
-            
-            <h3 class="section-title">設定管理</h3>
-            
-            <div class="mb-3">
-              <h4 class="subsection-title">バックアップ</h4>
-              <v-btn
-                color="primary"
-                variant="outlined"
-                prepend-icon="mdi-download"
-                @click="exportSettings"
-                class="mb-2"
-              >
-                設定をエクスポート
-              </v-btn>
-              <p class="setting-hint">
-                現在の設定のみをJSONファイルとして保存します
-              </p>
-              
-              <v-divider class="my-3" />
-              
-              <h4 class="subsection-title">リストア</h4>
-              <v-btn
-                color="primary"
-                variant="outlined"
-                prepend-icon="mdi-upload"
-                @click="$refs.settingsImportInput.click()"
-                class="mb-2"
-              >
-                設定をインポート
-              </v-btn>
-              <input
-                ref="settingsImportInput"
-                type="file"
-                accept=".json"
-                style="display: none"
-                @change="importSettings"
-              />
-              <p class="setting-hint">
-                エクスポートした設定ファイルを読み込んで適用します
-              </p>
-              
-              <v-divider class="my-3" />
-              
-              <h4 class="subsection-title">リセット</h4>
-              <v-btn
-                color="warning"
-                variant="outlined"
-                prepend-icon="mdi-restore"
-                @click="resetSettings"
-                class="mb-2"
-              >
-                設定を初期化
-              </v-btn>
-              <p class="setting-hint">
-                全ての設定をデフォルト値に戻します
-              </p>
-            </div>
           </v-window-item>
         </v-window>
       </v-card-text>
@@ -467,18 +408,72 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, onUnmounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { db } from '@/src/db'
 import { clearAllDocuments } from '@/src/rag/rag'
-import { useSettings } from '@/src/utils/settingsManager'
 
 const dialog = ref(false)
 const tab = ref('api')
 const showApiKey = ref(false)
 const showPat = ref(false)
 
-// 新しい設定マネージャーを使用
-const { settings, updateSettings, saveSettings: saveToManager, cleanup } = useSettings()
+interface Settings {
+  api: {
+    geminiApiKey: string
+    geminiModel: string
+  }
+  personalContext: {
+    name: string
+    role: string
+    background: string
+    goals: string
+    learningStyle: string
+    preferences: string
+  }
+  appearance: {
+    theme: string
+    fontSize: number
+    showTimestamps: boolean
+    compactMode: boolean
+  }
+  advanced: {
+    temperature: number
+    maxTokens: number
+    ragTopK: number
+    githubRepoUrl: string
+    githubPat: string
+    githubSourceRepoUrl: string
+  }
+}
+
+const settings = ref<Settings>({
+  api: {
+    geminiApiKey: '',
+    geminiModel: 'gemini-2.0-flash-exp'
+  },
+  personalContext: {
+    name: '',
+    role: '',
+    background: '',
+    goals: '',
+    learningStyle: '詳細な説明',
+    preferences: ''
+  },
+  appearance: {
+    theme: 'dark',
+    fontSize: 14,
+    showTimestamps: false,
+    compactMode: false
+  },
+  advanced: {
+    temperature: 0.7,
+    maxTokens: 2048,
+    ragTopK: 3,
+    githubRepoUrl: '',
+    githubPat: '',
+    githubSourceRepoUrl: ''
+  }
+})
 
 const isLoadingGithub = ref(false)
 const githubStatus = ref<{ message: string; type: 'success' | 'error' | 'info' | 'warning' }>({
@@ -490,10 +485,6 @@ const indexStatus = ref<{ message: string; type: 'success' | 'error' | 'info' | 
   type: 'info'
 })
 const isTriggeringWorkflow = ref(false)
-
-// 設定インポート用のref
-const settingsImportInput = ref<HTMLInputElement | null>(null)
-const importInput = ref<HTMLInputElement | null>(null)
 
 const learningStyles = [
   '簡潔な要点のみ',
@@ -517,6 +508,8 @@ const emit = defineEmits<{
 }>()
 
 onMounted(async () => {
+  loadSettings()
+  
   // 設定読み込み後、リポジトリURLが設定されている場合は自動取得を試みる
   await new Promise(resolve => setTimeout(resolve, 500))
   if (settings.value.advanced.githubRepoUrl && settings.value.advanced.githubRepoUrl.trim()) {
@@ -532,13 +525,9 @@ onMounted(async () => {
   }
 })
 
-onUnmounted(() => {
-  cleanup()
-})
-
 // 設定の変更を監視して自動保存
 watch(settings, (newSettings) => {
-  updateSettings(newSettings)
+  localStorage.setItem('custardweb_settings', JSON.stringify(newSettings))
   emit('settingsChanged', newSettings)
 }, { deep: true })
 
@@ -554,10 +543,20 @@ watch(() => settings.value.advanced.githubRepoUrl, async (newUrl, oldUrl) => {
   }
 })
 
-
+function loadSettings() {
+  const saved = localStorage.getItem('custardweb_settings')
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved)
+      settings.value = { ...settings.value, ...parsed }
+    } catch (e) {
+      console.error('Failed to load settings:', e)
+    }
+  }
+}
 
 function saveSettings() {
-  saveToManager(settings.value)
+  localStorage.setItem('custardweb_settings', JSON.stringify(settings.value))
   emit('settingsChanged', settings.value)
   dialog.value = false
   
@@ -682,106 +681,6 @@ async function clearAllData() {
   } catch (e) {
     console.error('Failed to clear all data:', e)
     alert('削除に失敗しました')
-  }
-}
-
-// 設定のみのバックアップ
-async function exportSettings() {
-  try {
-    const exportData = {
-      version: '1.0',
-      exportDate: new Date().toISOString(),
-      type: 'settings-only',
-      settings: settings.value
-    }
-    
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `custardweb-settings-${new Date().toISOString().split('T')[0]}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    
-    alert('設定をエクスポートしました')
-  } catch (error) {
-    console.error('Settings export error:', error)
-    alert('設定のエクスポートに失敗しました')
-  }
-}
-
-// 設定のみのリストア
-async function importSettings(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  
-  try {
-    const text = await file.text()
-    const importData = JSON.parse(text)
-    
-    if (importData.type !== 'settings-only' || !importData.settings) {
-      throw new Error('無効な設定ファイルです')
-    }
-    
-    // 設定を更新（APIキーは上書きしない）
-    const newSettings = { ...importData.settings }
-    if (settings.value.api?.geminiApiKey) {
-      newSettings.api = { ...newSettings.api, geminiApiKey: settings.value.api.geminiApiKey }
-    }
-    
-    updateSettings(newSettings)
-    await saveToManager(newSettings)
-    
-    alert('設定をインポートしました')
-  } catch (error) {
-    console.error('Settings import error:', error)
-    alert('設定のインポートに失敗しました: ' + (error instanceof Error ? error.message : '不明なエラー'))
-  } finally {
-    (event.target as HTMLInputElement).value = ''
-  }
-}
-
-// 設定をリセット
-async function resetSettings() {
-  if (!confirm('全ての設定をデフォルトに戻しますか？APIキーを除く全ての設定がリセットされます。')) {
-    return
-  }
-  
-  try {
-    const defaultSettings = {
-      api: {
-        geminiApiKey: settings.value.api?.geminiApiKey || '', // APIキーは保持
-        geminiModel: 'gemini-2.0-flash-exp',
-        temperature: 0.7,
-        maxTokens: 2048
-      },
-      personalContext: {
-        name: '',
-        role: '鳥人間チームメンバー',
-        expertise: '航空力学、機体設計',
-        goals: '安全で効率的な飛行の実現'
-      },
-      appearance: {
-        theme: 'dark',
-        fontSize: 'medium',
-        language: 'ja'
-      },
-      advanced: {
-        enableRAG: true,
-        ragSimilarityThreshold: 0.7,
-        maxContextLength: 4000,
-        autoSave: true,
-        enableTypingEffect: true
-      }
-    }
-    
-    updateSettings(defaultSettings)
-    await saveToManager(defaultSettings)
-    
-    alert('設定をリセットしました')
-  } catch (error) {
-    console.error('Settings reset error:', error)
-    alert('設定のリセットに失敗しました')
   }
 }
 
