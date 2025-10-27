@@ -11,7 +11,7 @@ export default defineNuxtConfig({
   
   // GitHub Pages設定
   app: {
-    baseURL: process.env.NODE_ENV === 'production' ? '/Sasaki-AI/' : '/',
+    baseURL: '/Sasaki-AI/',
     buildAssetsDir: 'assets',
   },
   
