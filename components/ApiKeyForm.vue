@@ -25,18 +25,22 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useSettings } from '@/src/utils/settingsManager'
 
 const apiKey = ref('')
+const { settings, updateSettings } = useSettings()
 
 onMounted(() => {
-  const savedKey = localStorage.getItem('GEMINI_API_KEY')
-  if (savedKey) {
-    apiKey.value = savedKey
-  }
+  apiKey.value = settings.value.api.geminiApiKey || ''
 })
 
 function save() {
-  localStorage.setItem('GEMINI_API_KEY', apiKey.value)
+  updateSettings({
+    api: {
+      ...settings.value.api,
+      geminiApiKey: apiKey.value
+    }
+  })
   alert('APIキーを保存しました')
 }
 </script>

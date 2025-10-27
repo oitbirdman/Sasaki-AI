@@ -26,10 +26,17 @@ export interface DocumentChunk {
   createdAt: number
 }
 
+export interface Settings {
+  id: string
+  data: any
+  updatedAt: number
+}
+
 export class AppDB extends Dexie {
   messages!: Dexie.Table<Message, number>
   conversations!: Dexie.Table<Conversation, number>
   documentChunks!: Dexie.Table<DocumentChunk, number>
+  settings!: Dexie.Table<Settings, string>
   
   constructor() {
     super('custardweb_db')
@@ -52,6 +59,13 @@ export class AppDB extends Dexie {
       messages: '++id,conversationId,role,createdAt',
       conversations: '++id,createdAt,updatedAt,isDeleted,deletedAt',
       documentChunks: '++id,documentId,chunkIndex,createdAt'
+    })
+    // バージョン5: settingsテーブル追加
+    this.version(5).stores({
+      messages: '++id,conversationId,role,createdAt',
+      conversations: '++id,createdAt,updatedAt,isDeleted,deletedAt',
+      documentChunks: '++id,documentId,chunkIndex,createdAt',
+      settings: 'id,data,updatedAt'
     })
   }
 }

@@ -513,39 +513,22 @@ const attachedFiles = ref<Array<{
 const previewGitHubUrl = computed(() => {
   if (!previewSourceId.value) return ''
   
-  const settings = localStorage.getItem('custardweb_settings')
-  if (!settings) return ''
+  const repoUrl = props.settings?.advanced?.githubRepoUrl
+  if (!repoUrl) return ''
   
-  try {
-    const parsed = JSON.parse(settings)
-    const repoUrl = parsed.advanced?.githubRepoUrl
-    if (!repoUrl) return ''
-    
-    const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/)
-    if (!match) return ''
-    
-    const [, owner, repo] = match
-    const cleanRepo = repo.replace(/\.git$/, '')
-    return `https://github.com/${owner}/${cleanRepo}/blob/main/${previewSourceId.value}`
-  } catch (e) {
-    console.error('Failed to generate GitHub URL:', e)
-    return ''
-  }
+  const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/)
+  if (!match) return ''
+  
+  const [, owner, repo] = match
+  const cleanRepo = repo.replace(/\.git$/, '')
+  return `https://github.com/${owner}/${cleanRepo}/blob/main/${previewSourceId.value}`
 })
 
 // リポジトリがパブリックかどうかを判定（PAT設定の有無で推測）
 const isPublicRepo = computed(() => {
-  const settings = localStorage.getItem('custardweb_settings')
-  if (!settings) return false
-  
-  try {
-    const parsed = JSON.parse(settings)
-    // PATが設定されていない場合はパブリックリポジトリの可能性が高い
-    // ただし、実際にはAPIで確認する必要があるため、保守的にfalseを返す
-    return !parsed.advanced?.githubPat
-  } catch (e) {
-    return false
-  }
+  // PATが設定されていない場合はパブリックリポジトリの可能性が高い
+  // ただし、実際にはAPIで確認する必要があるため、保守的にfalseを返す
+  return !props.settings?.advanced?.githubPat
 })
 
 onMounted(async () => {
@@ -667,14 +650,8 @@ async function renderPDF() {
     console.log('Attempting to fetch PDF from GitHub API...')
     
     try {
-      const settings = localStorage.getItem('custardweb_settings')
-      if (!settings) {
-        throw new Error('Settings not found')
-      }
-      
-      const parsed = JSON.parse(settings)
-      const repoUrl = parsed.advanced?.githubRepoUrl
-      const pat = parsed.advanced?.githubPat
+      const repoUrl = props.settings?.advanced?.githubRepoUrl
+      const pat = props.settings?.advanced?.githubPat
       
       if (!repoUrl) {
         throw new Error('Repository URL not configured')
@@ -813,14 +790,8 @@ async function refreshSinglePDFFile() {
     console.log('File path length:', previewSourceId.value.length)
     console.log('File path bytes:', [...previewSourceId.value].map(c => c.charCodeAt(0)))
     
-    const settings = localStorage.getItem('custardweb_settings')
-    if (!settings) {
-      throw new Error('設定が見つかりません')
-    }
-    
-    const parsed = JSON.parse(settings)
-    const repoUrl = parsed.advanced?.githubRepoUrl
-    const pat = parsed.advanced?.githubPat
+    const repoUrl = props.settings?.advanced?.githubRepoUrl
+    const pat = props.settings?.advanced?.githubPat
     
     console.log('Repository URL:', repoUrl)
     console.log('Has PAT:', !!pat)
@@ -993,15 +964,8 @@ async function refreshSinglePDFFile() {
 
 async function checkRepositoryStructure() {
   try {
-    const settings = localStorage.getItem('custardweb_settings')
-    if (!settings) {
-      showToast('設定が見つかりません', 'error')
-      return
-    }
-    
-    const parsed = JSON.parse(settings)
-    const repoUrl = parsed.advanced?.githubRepoUrl
-    const pat = parsed.advanced?.githubPat
+    const repoUrl = props.settings?.advanced?.githubRepoUrl
+    const pat = props.settings?.advanced?.githubPat
     
     if (!repoUrl) {
       showToast('リポジトリURLが設定されていません', 'error')
